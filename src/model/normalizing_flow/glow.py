@@ -394,7 +394,7 @@ class Glow(nn.Module):
 # --------------------
 
 
-def train_epoch(model, dataloader, optimizer, writer, epoch, args):
+def train_glow(model, optimizer, dataloader, writer, epoch, args):
     model.train()
 
     tic = time.time()
@@ -440,7 +440,7 @@ def train_epoch(model, dataloader, optimizer, writer, epoch, args):
         # save and generate
         if i % args.save_interval == 0:
             # generate samples
-            samples = generate(model, n_samples=4, z_stds=[0., 0.25, 0.7, 1.0])
+            samples = generate_data(model, n_samples=4, z_stds=[0., 0.25, 0.7, 1.0])
             images = make_grid(samples.cpu(), nrow=4, pad_value=1)
 
             # write stats and save checkpoints
@@ -470,13 +470,13 @@ def evaluate(model, dataloader, args):
 
 
 @torch.no_grad()
-def generate(model, n_samples, z_stds):
+def generate_data(model, n_data, z_stds):
     model.eval()
     print('Generating ...', end='\r')
 
     samples = []
     for z_std in z_stds:
-        sample, _ = model.inverse(batch_size=n_samples, z_std=z_std)
+        sample, _ = model.inverse(batch_size=n_data, z_std=z_std)
         log_probs = model.log_prob(sample, bits_per_pixel=True)
         samples.append(sample[log_probs.argsort().flip(0)])  # sort by log_prob; flip high (left) to low (right)
     return torch.cat(samples, 0)
