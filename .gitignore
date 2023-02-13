@@ -1,2 +1,10 @@
 inspectionProfiles
 .idea
+t10k-images-idx3-ubyte
+*.gz
+/sandbox/src/data/MNIST/raw/t10k-labels-idx1-ubyte
+/sandbox/src/data/MNIST/raw/train-images-idx3-ubyte
+/sandbox/src/data/MNIST/raw/train-labels-idx1-ubyte
+/src/data/__pycache__/dataloader.cpython-39.pyc
+/src/model/vae/__pycache__/vae.cpython-39.pyc
+/src/utils/__pycache__/utils.cpython-39.pyc
