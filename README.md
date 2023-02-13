@@ -7,3 +7,8 @@ Some classical architectures would be:
 - VAE
 - GAN
 - Diffusion Models
+
+# Reference repository
+
+- Normalizing flows:
+  - GLOW - Kingma et al. : https://proceedings.neurips.cc/paper/2018/file/d139db6a236200b21cc7f752979132d0-Paper.pdf
