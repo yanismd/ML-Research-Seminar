@@ -1,7 +1,7 @@
 import torch.optim as optim
 
 from src.data.dataloader import fetch_mnist_loader
-from src.model.vae.vae import VAE, train_vae_inverse_lostdata, restore_lostdata_data
+from src.model.vae.vae import VAE, train_vae_inverse_blur, restore_blur_data
 from src.utils.viz import display_restoration_process
 
 # Load the MNIST dataset
@@ -16,8 +16,9 @@ n_rows = 28
 n_cols = 28
 n_channels = 1
 
-# Set the alteration parameters
-square_size = 7
+# Set the blur parameters
+kernel_size = 7
+sigma = 5
 
 # Create the model
 model = VAE(
@@ -34,19 +35,21 @@ optimizer = optim.Adam(model.parameters())
 
 # Train the model
 n_epoch = 500
-model = train_vae_inverse_lostdata(
+model = train_vae_inverse_blur(
     model,
     optimizer,
     mnist_train_loader,
     n_epoch=n_epoch,
-    square_size=square_size
+    kernel_size=kernel_size,
+    sigma=sigma
 )
 
 # Try restoring data from the test set with the same noise applied as for the training set
-target_data_list, noisy_data_list, restored_data_list = restore_lostdata_data(
+target_data_list, noisy_data_list, restored_data_list = restore_blur_data(
     model,
     mnist_test_loader,
-    square_size=square_size
+    kernel_size=kernel_size,
+    sigma=sigma
 )
 
 # Display the results

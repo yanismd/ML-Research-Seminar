@@ -169,3 +169,45 @@ def restore_lostdata_data(vae_model, clean_data_loader, square_size):
         output_data_list.append(output_data)
 
     return target_data_list, noisy_data_list, output_data_list
+
+
+def train_vae_inverse_blur(vae_model, optimizer, data_train_loader, n_epoch, kernel_size, sigma):
+    for epoch in range(n_epoch):
+
+        train_loss = 0
+        for batch_idx, (data, _) in enumerate(data_train_loader):
+            optimizer.zero_grad()
+            # We add a square at the middle of the data in entry, the goal being to reconstruct the hidden area
+            lost_data = utils.pytorch_gaussian_blur(data, kernel_size=kernel_size, sigma=sigma)
+            # The model is training on noisy data, encoding the sample in the latent space
+            y, z_mu, z_log_var = vae_model(lost_data)
+            # The goal is then to decode from the latent space to the restored data
+            loss_vae = vae_model.loss_function(data, y, z_mu, z_log_var)
+            loss_vae.backward()
+            train_loss += loss_vae.item()
+            optimizer.step()
+
+            if batch_idx % 100 == 0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    epoch, batch_idx * len(data), len(data_train_loader.dataset),
+                           100. * batch_idx / len(data_train_loader), loss_vae.item() / len(data)))
+        print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
+
+    return vae_model
+
+
+def restore_blur_data(vae_model, clean_data_loader, kernel_size, sigma):
+    target_data_list = []
+    noisy_data_list = []
+    output_data_list = []
+
+    for batch_idx, (data, _) in enumerate(clean_data_loader):
+        target_data_list.append(data)
+
+        noisy_data = utils.pytorch_gaussian_blur(data, kernel_size=kernel_size, sigma=sigma)
+        noisy_data_list.append(noisy_data)
+
+        output_data, z_mu, z_log_var = vae_model(noisy_data)
+        output_data_list.append(output_data)
+
+    return target_data_list, noisy_data_list, output_data_list
