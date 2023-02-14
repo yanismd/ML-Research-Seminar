@@ -1,16 +1,17 @@
-import matplotlib.pyplot as plt
+import torch
 
 
 def pytorch_to_numpy(x):
     return x.detach().numpy()
 
 
-def display_images(imgs):
-    r = 1
-    c = imgs.shape[0]
-    fig, axs = plt.subplots(r, c)
-    for j in range(c):
-        # black and white images
-        axs[j].imshow(pytorch_to_numpy(imgs[j, 0, :, :]), cmap='gray')
-        axs[j].axis('off')
-    plt.show()
+def pytorch_noise(x, noise_mean, noise_std):
+    return x + (noise_mean + noise_std * torch.randn(x.shape))
+
+
+def pytorch_add_square(x, square_size):
+    tensor = x.clone()
+    img_width = x.shape[3]
+    img_height = x.shape[2]
+    tensor[:, :, img_height//2-square_size:img_height//2+square_size, img_width//2-square_size:img_width//2+square_size] = 0
+    return tensor

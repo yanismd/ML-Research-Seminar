@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import src.utils.utils as utils
+
 
 class VAE(torch.nn.Module):
     def __init__(self, h_dim_1, h_dim_2, z_dim, n_rows, n_cols, n_channels):
@@ -64,8 +66,8 @@ def train_vae(vae_model, optimizer, data_train_loader, n_epoch):
         for batch_idx, (data, _) in enumerate(data_train_loader):
             optimizer.zero_grad()
 
-            y, z_mu, z_log_var = vae_model(data)  # FILL IN STUDENT
-            loss_vae = vae_model.loss_function(data, y, z_mu, z_log_var)  # FILL IN STUDENT
+            y, z_mu, z_log_var = vae_model(data)
+            loss_vae = vae_model.loss_function(data, y, z_mu, z_log_var)
             loss_vae.backward()
             train_loss += loss_vae.item()
             optimizer.step()
@@ -83,3 +85,87 @@ def generate_data(vae_model, n_data=5):
     epsilon = torch.randn(n_data, 1, vae_model.z_dim)
     generations = vae_model.decoder(epsilon)
     return generations
+
+
+def train_vae_inverse_noise(vae_model, optimizer, data_train_loader, n_epoch, noise_mean, noise_std):
+    for epoch in range(n_epoch):
+
+        train_loss = 0
+        for batch_idx, (data, _) in enumerate(data_train_loader):
+            optimizer.zero_grad()
+            # We add a gaussian noise to the data in entry, the goal being to reconstruct it
+            noisy_data = utils.pytorch_noise(data, noise_mean, noise_std)
+            # The model is training on noisy data, encoding the sample in the latent space
+            y, z_mu, z_log_var = vae_model(noisy_data)
+            # The goal is then to decode from the latent space to the restored data
+            loss_vae = vae_model.loss_function(data, y, z_mu, z_log_var)
+            loss_vae.backward()
+            train_loss += loss_vae.item()
+            optimizer.step()
+
+            if batch_idx % 100 == 0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    epoch, batch_idx * len(data), len(data_train_loader.dataset),
+                           100. * batch_idx / len(data_train_loader), loss_vae.item() / len(data)))
+        print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
+
+    return vae_model
+
+
+def restore_noisy_data(vae_model, clean_data_loader, noise_mean, noise_std):
+    target_data_list = []
+    noisy_data_list = []
+    output_data_list = []
+
+    for batch_idx, (data, _) in enumerate(clean_data_loader):
+        target_data_list.append(data)
+
+        noisy_data = utils.pytorch_noise(data, noise_mean, noise_std)
+        noisy_data_list.append(noisy_data)
+
+        output_data, z_mu, z_log_var = vae_model(noisy_data)
+        output_data_list.append(output_data)
+
+    return target_data_list, noisy_data_list, output_data_list
+
+
+def train_vae_inverse_lostdata(vae_model, optimizer, data_train_loader, n_epoch, square_size):
+    for epoch in range(n_epoch):
+
+        train_loss = 0
+        for batch_idx, (data, _) in enumerate(data_train_loader):
+            optimizer.zero_grad()
+            # We add a square at the middle of the data in entry, the goal being to reconstruct the hidden area
+            lost_data = utils.pytorch_add_square(data, square_size)
+            # The model is training on noisy data, encoding the sample in the latent space
+            y, z_mu, z_log_var = vae_model(lost_data)
+            # The goal is then to decode from the latent space to the restored data
+            loss_vae = vae_model.loss_function(data, y, z_mu, z_log_var)
+            loss_vae.backward()
+            train_loss += loss_vae.item()
+            optimizer.step()
+
+            if batch_idx % 100 == 0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    epoch, batch_idx * len(data), len(data_train_loader.dataset),
+                           100. * batch_idx / len(data_train_loader), loss_vae.item() / len(data)))
+        print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
+
+    return vae_model
+
+
+def restore_lostdata_data(vae_model, clean_data_loader, square_size):
+    target_data_list = []
+    noisy_data_list = []
+    output_data_list = []
+
+    for batch_idx, (data, _) in enumerate(clean_data_loader):
+        target_data_list.append(data)
+
+        noisy_data = utils.pytorch_add_square(data, square_size)
+        noisy_data_list.append(noisy_data)
+
+        output_data, z_mu, z_log_var = vae_model(noisy_data)
+        output_data_list.append(output_data)
+
+    return target_data_list, noisy_data_list, output_data_list

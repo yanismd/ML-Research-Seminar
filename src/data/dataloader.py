@@ -16,7 +16,8 @@ def fetch_mnist_loader(
         n_samples_test=512,
         batch_size=256,
         path_to_data="."
-):
+) -> tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+
     mnist_trainset = datasets.MNIST(f'{path_to_data}', train=True, download=True, transform=transforms.ToTensor())
     mnist_testset = datasets.MNIST(f'{path_to_data}', train=False, download=True, transform=transforms.ToTensor())
 
