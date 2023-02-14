@@ -72,10 +72,6 @@ def train_vae(vae_model, optimizer, data_train_loader, n_epoch):
             train_loss += loss_vae.item()
             optimizer.step()
 
-            if batch_idx % 100 == 0:
-                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, batch_idx * len(data), len(data_train_loader.dataset),
-                           100. * batch_idx / len(data_train_loader), loss_vae.item() / len(data)))
         print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
 
     return vae_model
@@ -103,10 +99,6 @@ def train_vae_inverse_noise(vae_model, optimizer, data_train_loader, n_epoch, no
             train_loss += loss_vae.item()
             optimizer.step()
 
-            if batch_idx % 100 == 0:
-                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, batch_idx * len(data), len(data_train_loader.dataset),
-                           100. * batch_idx / len(data_train_loader), loss_vae.item() / len(data)))
         print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
 
     return vae_model
@@ -145,10 +137,6 @@ def train_vae_inverse_lostdata(vae_model, optimizer, data_train_loader, n_epoch,
             train_loss += loss_vae.item()
             optimizer.step()
 
-            if batch_idx % 100 == 0:
-                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, batch_idx * len(data), len(data_train_loader.dataset),
-                           100. * batch_idx / len(data_train_loader), loss_vae.item() / len(data)))
         print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
 
     return vae_model
@@ -187,10 +175,6 @@ def train_vae_inverse_blur(vae_model, optimizer, data_train_loader, n_epoch, ker
             train_loss += loss_vae.item()
             optimizer.step()
 
-            if batch_idx % 100 == 0:
-                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, batch_idx * len(data), len(data_train_loader.dataset),
-                           100. * batch_idx / len(data_train_loader), loss_vae.item() / len(data)))
         print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
 
     return vae_model

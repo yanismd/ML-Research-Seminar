@@ -12,3 +12,4 @@ t10k-images-idx3-ubyte
 /src/data/MNIST/raw/train-images-idx3-ubyte
 /src/data/MNIST/raw/train-labels-idx1-ubyte
 /src/utils/__pycache__/viz.cpython-39.pyc
+*.pyc

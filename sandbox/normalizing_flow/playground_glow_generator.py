@@ -17,21 +17,33 @@ n_cols = 28
 n_channels = 1
 
 # Create the model
+flow_steps = 2
+L = 2  # Dimension reduction parameter (reduce by 2 the size of the data at each value)
+
 model = Glow(
-    width=10,
-    depth=5,
-    n_levels=3,
-    input_dims=n_rows * n_cols * n_channels
+    image_shape=(n_channels, n_rows, n_cols),
+    hidden_channels=30,
+    K=flow_steps,
+    L=L,
+    actnorm_scale=100,
+    flow_permutation="invconv",
+    flow_coupling="affine",
+    LU_decomposed=True,
+    y_classes=None,
+    learn_top=True,
+    y_condition=False
 )
+model.set_actnorm_init()
+model.eval()
 
 # Define the optimizer of the model
-optimizer = optim.Adam(model.parameters())
+optimizer = optim.Adamax(model.parameters(), lr=0.1, weight_decay=5e-5)
 
 # Train the model
 n_epoch = 200
 model = train_glow(model, optimizer, mnist_train_loader, n_epoch=n_epoch)
 
 # Generate new samples
-generated_imgs = generate_data(model, n_data=5)
+generated_imgs = generate_data(model, temperature=0.7)
 # Display the results
 display_images(generated_imgs)

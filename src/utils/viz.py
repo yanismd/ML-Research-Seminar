@@ -3,14 +3,24 @@ from src.utils.utils import pytorch_to_numpy
 
 
 def display_images(imgs):
-    r = 1
-    c = imgs.shape[0]
+    r = imgs.shape[0]//5
+    c = 5
     fig, axs = plt.subplots(r, c)
     fig.suptitle("Generated data")
-    for j in range(c):
-        # black and white images
-        axs[j].imshow(pytorch_to_numpy(imgs[j, 0, :, :]))
-        axs[j].axis('off')
+    k = 0
+    if r == 1:
+        for j in range(c):
+            axs[j].imshow(pytorch_to_numpy(imgs[j, 0, :, :]))
+            axs[j].axis('off')
+
+        plt.show()
+        return
+
+    for i in range(r):
+        for j in range(c):
+            axs[i][j].imshow(pytorch_to_numpy(imgs[k, 0, :, :]))
+            axs[i][j].axis('off')
+            k += 1
     plt.show()
 
 

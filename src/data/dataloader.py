@@ -2,13 +2,8 @@
 Data loader for all datasets
 """
 
-import numpy as np
 from torchvision import datasets, transforms
 import torch
-
-import scipy.io
-import string
-import pandas as pd
 
 
 def fetch_mnist_loader(
