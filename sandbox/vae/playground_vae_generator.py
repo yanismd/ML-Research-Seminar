@@ -18,8 +18,8 @@ n_channels = 1
 
 # Create the model
 model = VAE(
-    h_dim_1=512,
-    h_dim_2=256,
+    hidden_sizes_encoder=[512, 256],
+    hidden_sizes_decoder=[256, 512],
     z_dim=20,
     n_rows=n_rows,
     n_cols=n_cols,
@@ -27,7 +27,7 @@ model = VAE(
 )
 
 # Define the optimizer of the model
-optimizer = optim.Adam(model.parameters())
+optimizer = optim.Adam(model.parameters(), lr=10e-4)
 
 # Train the model
 n_epoch = 200

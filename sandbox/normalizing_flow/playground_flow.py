@@ -26,7 +26,11 @@ encoder = FCNEncoder(
     dim_input=n_channels * n_cols * n_rows
 )
 flow_model = FlowModel(
-    flows=['PlanarFlow'] * 10,
+    flows=[
+              'PlanarFlow',
+              'RadialFlow',
+              'PlanarFlow',
+          ] + ['PlanarFlow'] * 8,
     D=z_dim
 )
 decoder = FCNDecoder(

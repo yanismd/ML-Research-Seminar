@@ -3,6 +3,14 @@ import torch
 import torchvision.transforms as transforms
 
 
+def sampling(mu, log_var):
+    # this function samples a Gaussian distribution,
+    # with average (mu) and standard deviation specified (using log_var)
+    std = torch.exp(0.5 * log_var)
+    eps = torch.randn_like(std)
+    return eps.mul(std).add_(mu)  # return z sample
+
+
 def pytorch_to_numpy(x):
     return x.detach().numpy()
 
