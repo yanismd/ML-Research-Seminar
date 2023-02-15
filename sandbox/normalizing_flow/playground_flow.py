@@ -24,7 +24,7 @@ z_dim = 20
 # Create the model
 
 model = FlowModel(
-    flows=['PlanarFlow'] * 2,
+    flows=['PlanarFlow'] * 4,
     hidden_sizes_encoder=[512, 256],
     hidden_sizes_decoder=[256, 512],
     z_dim=z_dim,
@@ -37,11 +37,11 @@ model = FlowModel(
 # Define the optimizer of the model
 optimizer = optim.Adam(
     model.parameters(),
-    lr=10e-5
+    lr=10e-4
 )
 
 # Train the model
-n_epoch = 30
+n_epoch = 200
 model = train_flow(
     model,
     optimizer,

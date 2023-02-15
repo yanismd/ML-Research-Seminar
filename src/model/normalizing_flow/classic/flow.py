@@ -95,22 +95,11 @@ class FlowModel(nn.Module):
         """
         mu, log_var = self.encoder(torch.flatten(x, start_dim=1))
         z = sampling(mu, log_var)
-        var = torch.exp(log_var)
-
-        log_prob_z0 = (-0.5 * torch.log(torch.tensor(2 * math.pi)) - log_var - 0.5 * ((z - mu) / var) ** 2) \
-            .sum(dim=1)
-
-        log_det = torch.zeros((x.shape[0],))
 
         for layer in self.net:
             z, ld = layer(z)
-            log_det += ld
 
-        # log_prob_zk = self.prior.log_prob(z)
-        log_prob_zk = (-0.5 * (torch.log(torch.tensor(2 * math.pi)) + z ** 2)) \
-            .sum(dim=1)
-
-        return self.decoder(z), mu, log_var, log_prob_z0, log_prob_zk, log_det
+        return self.decoder(z), mu, log_var
 
     def loss_function(self, x, y, mu, log_var):
         reconstruction_error = F.binary_cross_entropy(y.view(-1, self.n_pixels), x.view(-1, self.n_pixels),
@@ -129,16 +118,11 @@ def train_flow(model, optimizer, data_train_loader, n_epoch):
         train_loss = 0
         for batch_idx, (data, _) in enumerate(data_train_loader):
             optimizer.zero_grad()
-            x_hat, mu, log_var, log_prob_z0, log_prob_zk, log_det = model(data)
-            x_hat_flattened = torch.flatten(x_hat, start_dim=1)
-            data_flattened = torch.flatten(data, start_dim=1)
 
-            loss = torch.mean(log_prob_z0) + loss_fn(x_hat_flattened.float(), data_flattened.float()) - torch.mean(
-                log_prob_zk) - torch.mean(log_det)
-            loss.backward()
-
-            train_loss += loss.item()
-
+            y, z_mu, z_log_var = model(data)
+            loss_vae = model.loss_function(data, y, z_mu, z_log_var)
+            loss_vae.backward()
+            train_loss += loss_vae.item()
             optimizer.step()
 
         print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
