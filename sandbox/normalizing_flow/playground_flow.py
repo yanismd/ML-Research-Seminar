@@ -37,11 +37,11 @@ model = FlowModel(
 # Define the optimizer of the model
 optimizer = optim.Adam(
     model.parameters(),
-    lr=10e-4
+    lr=10e-3
 )
 
 # Train the model
-n_epoch = 200
+n_epoch = 500
 model = train_flow(
     model,
     optimizer,
