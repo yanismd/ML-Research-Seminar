@@ -1,7 +1,7 @@
 import torch.optim as optim
 
 from src.data.dataloader import fetch_mnist_loader
-from src.model.normalizing_flow.glow import Glow, train_glow, generate_data
+from src.model.normalizing_flow.glow.glow import Glow, train_glow, generate_data
 from src.utils.viz import display_images
 
 # Load the MNIST dataset
