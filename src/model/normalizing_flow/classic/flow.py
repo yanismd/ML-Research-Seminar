@@ -3,17 +3,48 @@ from typing import List
 import torch
 from torch.distributions.multivariate_normal import MultivariateNormal
 from src.model.normalizing_flow.classic.modules import *
+from src.utils.utils import sampling
 import math
 
-from torch.nn import BCEWithLogitsLoss
+from torch.nn import BCELoss
 
 
-class FCNEncoder(nn.Module):
-    def __init__(self, hidden_sizes: List[int], dim_input: int, activation=nn.ReLU()):
-        super().__init__()
+class Flow_Encoder(torch.nn.Module):
+    def __init__(self, hidden_sizes, z_dim, n_channels, n_rows, n_cols):
+        super(Flow_Encoder, self).__init__()
 
-        hidden_sizes = [dim_input] + hidden_sizes
+        self.n_channels = n_channels
+        self.n_rows = n_rows
+        self.n_cols = n_cols
+        input_dim = n_channels * n_rows * n_cols
 
+        hidden_sizes = [input_dim] + hidden_sizes
+
+        self.net = []
+        for i in range(len(hidden_sizes) - 1):
+            self.net.append(nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]))
+            self.net.append(nn.ReLU())
+
+        self.net = nn.Sequential(*self.net)
+
+        self.mu_net = nn.Linear(hidden_sizes[-1], z_dim)
+        self.sigma_net = nn.Linear(hidden_sizes[-1], z_dim)
+
+    def forward(self, x):
+        h = self.net(x)
+        return self.mu_net(h), self.sigma_net(h)
+
+
+class Flow_Decoder(torch.nn.Module):
+    def __init__(self, hidden_sizes, z_dim, n_channels, n_rows, n_cols):
+        super(Flow_Decoder, self).__init__()
+
+        self.n_channels = n_channels
+        self.n_rows = n_rows
+        self.n_cols = n_cols
+        input_dim = n_channels * n_rows * n_cols
+
+        hidden_sizes = [z_dim] + hidden_sizes
         self.net = []
 
         for i in range(len(hidden_sizes) - 1):
@@ -22,85 +53,87 @@ class FCNEncoder(nn.Module):
 
         self.net = nn.Sequential(*self.net)
 
-    def forward(self, x):
-        return self.net(x)
+        self.output_net = nn.Linear(hidden_sizes[-1], input_dim)
+
+    def forward(self, z: torch.Tensor):
+        h = self.net(z)
+        return F.sigmoid(self.output_net(h)).view(-1, self.n_channels, self.n_rows, self.n_cols)
 
 
 class FlowModel(nn.Module):
-    def __init__(self, flows: List[str], D: int, activation=torch.tanh):
+    def __init__(
+            self,
+            flows: List[str],
+            hidden_sizes_encoder,
+            hidden_sizes_decoder,
+            z_dim,
+            n_channels,
+            n_rows,
+            n_cols,
+            activation=torch.tanh
+    ):
         super().__init__()
 
-        self.prior = MultivariateNormal(torch.zeros(D), torch.eye(D))
+        self.encoder = Flow_Encoder(hidden_sizes_encoder, z_dim, n_channels, n_rows, n_cols)
+        self.decoder = Flow_Decoder(hidden_sizes_decoder, z_dim, n_channels, n_rows, n_cols)
+
         self.net = []
 
         for i in range(len(flows)):
             layer_class = eval(flows[i])
-            self.net.append(layer_class(D, activation))
+            self.net.append(layer_class(z_dim, activation))
 
         self.net = nn.Sequential(*self.net)
 
-        self.D = D
+        self.z_dim = z_dim
+        self.n_pixels = n_cols * n_rows
 
-    def forward(self, mu: torch.Tensor, log_sigma: torch.Tensor):
+    def forward(self, x: torch.Tensor):
         """
         mu: tensor with shape (batch_size, D)
         sigma: tensor with shape (batch_size, D)
         """
-        sigma = torch.exp(log_sigma)
-        batch_size = mu.shape[0]
-        samples = self.prior.sample(torch.Size([batch_size]))
-        z = samples * sigma + mu
+        mu, log_var = self.encoder(torch.flatten(x, start_dim=1))
+        z = sampling(mu, log_var)
+        var = torch.exp(log_var)
 
-        log_prob_z0 = torch.sum(
-            -0.5 * torch.log(torch.tensor(2 * math.pi)) -
-            log_sigma - 0.5 * ((z - mu) / sigma) ** 2,
-            axis=1)
+        log_prob_z0 = (-0.5 * torch.log(torch.tensor(2 * math.pi)) - log_var - 0.5 * ((z - mu) / var) ** 2) \
+            .sum(dim=1)
 
-        log_det = torch.zeros((batch_size,))
+        log_det = torch.zeros((x.shape[0],))
 
         for layer in self.net:
             z, ld = layer(z)
             log_det += ld
 
         # log_prob_zk = self.prior.log_prob(z)
-        log_prob_zk = torch.sum(
-            -0.5 * (torch.log(torch.tensor(2 * math.pi)) + z ** 2),
-            axis=1)
+        log_prob_zk = (-0.5 * (torch.log(torch.tensor(2 * math.pi)) + z ** 2)) \
+            .sum(dim=1)
 
-        return z, log_prob_z0, log_prob_zk, log_det
+        return self.decoder(z), mu, log_var, log_prob_z0, log_prob_zk, log_det
 
+    def loss_function(self, x, y, mu, log_var):
+        reconstruction_error = F.binary_cross_entropy(y.view(-1, self.n_pixels), x.view(-1, self.n_pixels),
+                                                      reduction='sum')
 
-class FCNDecoder(nn.Module):
-    def __init__(self, hidden_sizes: List[int], dim_input: int, activation=nn.ReLU()):
-        super().__init__()
+        KLD = 0.5 * torch.sum(mu ** 2 + torch.exp(log_var) - 1 - log_var)
 
-        hidden_sizes = [dim_input] + hidden_sizes
-        self.net = []
-
-        for i in range(len(hidden_sizes) - 1):
-            self.net.append(nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]))
-            self.net.append(nn.ReLU())
-
-        self.net = nn.Sequential(*self.net)
-
-    def forward(self, z: torch.Tensor):
-        return self.net(z)
+        return reconstruction_error + KLD
 
 
-def train_flow(encoder, decoder, flow_model, optimizer, data_train_loader, n_epoch):
-    loss_fn = BCEWithLogitsLoss()
+def train_flow(model, optimizer, data_train_loader, n_epoch):
+    loss_fn = BCELoss()
 
     for epoch in range(n_epoch):
 
         train_loss = 0
         for batch_idx, (data, _) in enumerate(data_train_loader):
             optimizer.zero_grad()
-            out = encoder(data.view(-1, 784).float())
-            mu, log_sigma = out[:, :40], out[:, 40:]
-            z_k, log_prob_z0, log_prob_zk, log_det = flow_model(mu, log_sigma)
-            x_hat = decoder(z_k)
+            x_hat, mu, log_var, log_prob_z0, log_prob_zk, log_det = model(data)
+            x_hat_flattened = torch.flatten(x_hat, start_dim=1)
+            data_flattened = torch.flatten(data, start_dim=1)
 
-            loss = torch.mean(log_prob_z0) + loss_fn(x_hat, data.view(-1, 784).float()) - torch.mean(
+            loss = torch.mean(log_prob_z0) + loss_fn(x_hat_flattened.float(), data_flattened.float()) - torch.mean(
                 log_prob_zk) - torch.mean(log_det)
             loss.backward()
 
@@ -110,10 +143,10 @@ def train_flow(encoder, decoder, flow_model, optimizer, data_train_loader, n_epo
 
         print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
 
-    return encoder, decoder, flow_model
+    return model
 
 
-def generate_data(flow_model, decoder, n_data, z_dim):
-    mu, log_sigma = torch.randn(n_data, z_dim), torch.randn(n_data, z_dim)
-    z, log_prob_z0, log_prob_zk, log_det = flow_model(mu, log_sigma)
-    return decoder(z).view(-1, 1, 28, 28)
+def generate_data(flow_model, n_data=5):
+    epsilon = torch.randn(n_data, 1, flow_model.z_dim)
+    generations = flow_model.decoder(epsilon)
+    return generations

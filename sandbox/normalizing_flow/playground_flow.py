@@ -1,7 +1,9 @@
+import torch
+import torch.nn.functional as F
 import torch.optim as optim
 
 from src.data.dataloader import fetch_mnist_loader
-from src.model.normalizing_flow.classic.flow import FCNEncoder, FCNDecoder, FlowModel, train_flow, generate_data
+from src.model.normalizing_flow.classic.flow import FlowModel, train_flow, generate_data
 from src.utils.viz import display_images
 
 # Load the MNIST dataset
@@ -17,43 +19,37 @@ n_cols = 28
 n_channels = 1
 
 # Define the encoding dimension
-z_dim = 40
+z_dim = 20
 
 # Create the model
 
-encoder = FCNEncoder(
-    hidden_sizes=[512, 256, 2*z_dim],
-    dim_input=n_channels * n_cols * n_rows
-)
-flow_model = FlowModel(
-    flows=[
-              'PlanarFlow',
-              'RadialFlow',
-              'PlanarFlow',
-          ] + ['PlanarFlow'] * 8,
-    D=z_dim
-)
-decoder = FCNDecoder(
-    hidden_sizes=[2*z_dim, 256, 512, n_channels * n_cols * n_rows],
-    dim_input=z_dim
+model = FlowModel(
+    flows=['PlanarFlow'] * 2,
+    hidden_sizes_encoder=[512, 256],
+    hidden_sizes_decoder=[256, 512],
+    z_dim=z_dim,
+    n_channels=n_channels,
+    n_rows=n_rows,
+    n_cols=n_cols,
+    activation=F.elu
 )
 
 # Define the optimizer of the model
 optimizer = optim.Adam(
-    list(encoder.parameters()) + list(flow_model.parameters()) + list(decoder.parameters()),
-    lr=10e-4
+    model.parameters(),
+    lr=10e-5
 )
 
 # Train the model
-n_epoch = 100
+n_epoch = 30
 model = train_flow(
-    encoder, decoder, flow_model,
+    model,
     optimizer,
     mnist_train_loader,
     n_epoch=n_epoch
 )
 
 # Generate new samples
-generated_imgs = generate_data(flow_model, decoder, n_data=5, z_dim=z_dim)
+generated_imgs = generate_data(model, n_data=5)
 # Display the results
 display_images(generated_imgs)
