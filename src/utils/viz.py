@@ -10,7 +10,8 @@ def display_images(imgs):
     k = 0
     if r == 1:
         for j in range(c):
-            axs[j].imshow(pytorch_to_numpy(imgs[j, 0, :, :]))
+            display_img = pytorch_to_numpy(imgs[j, :, :, :].permute(1, 2, 0))
+            axs[j].imshow(display_img)
             axs[j].axis('off')
 
         plt.show()
@@ -18,7 +19,8 @@ def display_images(imgs):
 
     for i in range(r):
         for j in range(c):
-            axs[i][j].imshow(pytorch_to_numpy(imgs[k, 0, :, :]))
+            display_img = pytorch_to_numpy(imgs[k, :, :, :].permute(1, 2, 0))
+            axs[i][j].imshow(display_img)
             axs[i][j].axis('off')
             k += 1
     plt.show()

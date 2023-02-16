@@ -2,21 +2,18 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-from src.data.dataloader import fetch_mnist_loader
+from src.data.dataloader import fetch_mnist_loader, fetch_cifar_loader
 from src.model.normalizing_flow.classic.flow import FlowModel, train_flow, generate_data
 from src.utils.viz import display_images
 
 # Load the MNIST dataset
 
-mnist_train_loader, mnist_test_loader = fetch_mnist_loader(
+mnist_train_loader, mnist_test_loader, (n_channels, n_rows, n_cols) = fetch_cifar_loader(
     n_samples_train=1000,
     n_samples_test=512,
     batch_size=256,
     path_to_data="../../src/data/"
 )
-n_rows = 28
-n_cols = 28
-n_channels = 1
 
 # Define the encoding dimension
 z_dim = 20
@@ -41,7 +38,7 @@ optimizer = optim.Adam(
 )
 
 # Train the model
-n_epoch = 500
+n_epoch = 1000
 model = train_flow(
     model,
     optimizer,

@@ -6,15 +6,12 @@ from src.utils.viz import display_restoration_process
 
 # Load the MNIST dataset
 
-mnist_train_loader, mnist_test_loader = fetch_mnist_loader(
+mnist_train_loader, mnist_test_loader, (n_channels, n_rows, n_cols) = fetch_mnist_loader(
     n_samples_train=1000,
     n_samples_test=1000,
     batch_size=256,
     path_to_data="../../src/data/"
 )
-n_rows = 28
-n_cols = 28
-n_channels = 1
 
 # Set the blur parameters
 kernel_size = 7
