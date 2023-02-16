@@ -1,5 +1,6 @@
 from typing import List
 
+import torch
 from torch.nn import BCELoss
 
 from src.model.normalizing_flow.classic.modules import *
@@ -93,8 +94,18 @@ class FlowModel(nn.Module):
         mu, log_var = self.encoder(torch.flatten(x, start_dim=1))
         z = utils.sampling(mu, log_var)
 
+        log_prob_z0 = (-0.5 * torch.log(torch.tensor(2 * torch.pi))
+                       - log_var - 0.5 * ((z - mu) / torch.sqrt(torch.exp(log_var))) ** 2) \
+            .sum(dim=1)
+
+        log_det = torch.zeros((x.shape[0],))
+
         for layer in self.net:
             z, ld = layer(z)
+            log_det += ld
+
+        log_prob_zk = (-0.5 * (torch.log(torch.tensor(2 * torch.pi)) + z**2))\
+            .sum(dim=1)
 
         return self.decoder(z), mu, log_var
 

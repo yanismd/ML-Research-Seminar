@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.model.normalizing_flow.modules import (
+from src.model.normalizing_flow.glow.modules import (
     Conv2d,
     Conv2dZeros,
     ActNorm2d,
