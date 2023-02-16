@@ -1,12 +1,9 @@
 from typing import List
 
-import torch
-from torch.distributions.multivariate_normal import MultivariateNormal
-from src.model.normalizing_flow.classic.modules import *
-from src.utils.utils import sampling
-import math
-
 from torch.nn import BCELoss
+
+from src.model.normalizing_flow.classic.modules import *
+import src.utils.utils as utils
 
 
 class Flow_Encoder(torch.nn.Module):
@@ -94,7 +91,7 @@ class FlowModel(nn.Module):
         sigma: tensor with shape (batch_size, D)
         """
         mu, log_var = self.encoder(torch.flatten(x, start_dim=1))
-        z = sampling(mu, log_var)
+        z = utils.sampling(mu, log_var)
 
         for layer in self.net:
             z, ld = layer(z)
@@ -134,3 +131,117 @@ def generate_data(flow_model, n_data=5):
     epsilon = torch.randn(n_data, 1, flow_model.z_dim)
     generations = flow_model.decoder(epsilon)
     return generations
+
+
+def train_flow_inverse_noise(model, optimizer, data_train_loader, n_epoch, noise_mean, noise_std):
+    for epoch in range(n_epoch):
+
+        train_loss = 0
+        for batch_idx, (data, _) in enumerate(data_train_loader):
+            optimizer.zero_grad()
+            # We add a gaussian noise to the data in entry, the goal being to reconstruct it
+            noisy_data = utils.pytorch_noise(data, noise_mean, noise_std)
+            # The model is training on noisy data, encoding the sample in the latent space
+            y, z_mu, z_log_var = model(noisy_data)
+            # The goal is then to decode from the latent space to the restored data
+            loss_vae = model.loss_function(data, y, z_mu, z_log_var)
+            loss_vae.backward()
+            train_loss += loss_vae.item()
+            optimizer.step()
+
+        print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
+
+    return model
+
+
+def restore_noisy_data(model, clean_data_loader, noise_mean, noise_std):
+    target_data_list = []
+    noisy_data_list = []
+    output_data_list = []
+
+    for batch_idx, (data, _) in enumerate(clean_data_loader):
+        target_data_list.append(data)
+
+        noisy_data = utils.pytorch_noise(data, noise_mean, noise_std)
+        noisy_data_list.append(noisy_data)
+
+        output_data, z_mu, z_log_var = model(noisy_data)
+        output_data_list.append(output_data)
+
+    return target_data_list, noisy_data_list, output_data_list
+
+
+def train_flow_inverse_lostdata(model, optimizer, data_train_loader, n_epoch, square_size):
+    for epoch in range(n_epoch):
+
+        train_loss = 0
+        for batch_idx, (data, _) in enumerate(data_train_loader):
+            optimizer.zero_grad()
+            # We add a square at the middle of the data in entry, the goal being to reconstruct the hidden area
+            lost_data = utils.pytorch_add_square(data, square_size)
+            # The model is training on noisy data, encoding the sample in the latent space
+            y, z_mu, z_log_var = model(lost_data)
+            # The goal is then to decode from the latent space to the restored data
+            loss_vae = model.loss_function(data, y, z_mu, z_log_var)
+            loss_vae.backward()
+            train_loss += loss_vae.item()
+            optimizer.step()
+
+        print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
+
+    return model
+
+
+def restore_lostdata_data(model, clean_data_loader, square_size):
+    target_data_list = []
+    noisy_data_list = []
+    output_data_list = []
+
+    for batch_idx, (data, _) in enumerate(clean_data_loader):
+        target_data_list.append(data)
+
+        noisy_data = utils.pytorch_add_square(data, square_size)
+        noisy_data_list.append(noisy_data)
+
+        output_data, z_mu, z_log_var = model(noisy_data)
+        output_data_list.append(output_data)
+
+    return target_data_list, noisy_data_list, output_data_list
+
+
+def train_flow_inverse_blur(model, optimizer, data_train_loader, n_epoch, kernel_size, sigma):
+    for epoch in range(n_epoch):
+
+        train_loss = 0
+        for batch_idx, (data, _) in enumerate(data_train_loader):
+            optimizer.zero_grad()
+            # We add a square at the middle of the data in entry, the goal being to reconstruct the hidden area
+            lost_data = utils.pytorch_gaussian_blur(data, kernel_size=kernel_size, sigma=sigma)
+            # The model is training on noisy data, encoding the sample in the latent space
+            y, z_mu, z_log_var = model(lost_data)
+            # The goal is then to decode from the latent space to the restored data
+            loss_vae = model.loss_function(data, y, z_mu, z_log_var)
+            loss_vae.backward()
+            train_loss += loss_vae.item()
+            optimizer.step()
+
+        print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
+
+    return model
+
+
+def restore_blur_data(model, clean_data_loader, kernel_size, sigma):
+    target_data_list = []
+    noisy_data_list = []
+    output_data_list = []
+
+    for batch_idx, (data, _) in enumerate(clean_data_loader):
+        target_data_list.append(data)
+
+        noisy_data = utils.pytorch_gaussian_blur(data, kernel_size=kernel_size, sigma=sigma)
+        noisy_data_list.append(noisy_data)
+
+        output_data, z_mu, z_log_var = model(noisy_data)
+        output_data_list.append(output_data)
+
+    return target_data_list, noisy_data_list, output_data_list
