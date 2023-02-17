@@ -6,7 +6,7 @@ from src.utils.viz import display_images
 
 # Load the MNIST dataset
 
-mnist_train_loader, mnist_test_loader, (n_channels, n_rows, n_cols) = fetch_cifar_loader(
+data_train_loader, data_test_loader, (n_channels, n_rows, n_cols) = fetch_cifar_loader(
     n_samples_train=1000,
     n_samples_test=512,
     batch_size=256,
@@ -28,7 +28,7 @@ optimizer = optim.Adam(model.parameters(), lr=10e-4)
 
 # Train the model
 n_epoch = 200
-model = train_vae(model, optimizer, mnist_train_loader, n_epoch=n_epoch)
+model = train_vae(model, optimizer, data_train_loader, n_epoch=n_epoch)
 
 # Generate new samples
 generated_imgs = generate_data(model, n_data=5)

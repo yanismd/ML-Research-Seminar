@@ -7,7 +7,7 @@ from src.utils.viz import display_restoration_process
 
 # Load the MNIST dataset
 
-mnist_train_loader, mnist_test_loader, (n_channels, n_rows, n_cols) = fetch_mnist_loader(
+data_train_loader, data_test_loader, (n_channels, n_rows, n_cols) = fetch_mnist_loader(
     n_samples_train=1000,
     n_samples_test=1000,
     batch_size=256,
@@ -42,7 +42,7 @@ n_epoch = 500
 model = train_flow_inverse_blur(
     model,
     optimizer,
-    mnist_train_loader,
+    data_train_loader,
     n_epoch=n_epoch,
     kernel_size=kernel_size,
     sigma=sigma
@@ -51,7 +51,7 @@ model = train_flow_inverse_blur(
 # Try restoring data from the test set with the same noise applied as for the training set
 target_data_list, noisy_data_list, restored_data_list = restore_blur_data(
     model,
-    mnist_test_loader,
+    data_test_loader,
     kernel_size=kernel_size,
     sigma=sigma
 )
