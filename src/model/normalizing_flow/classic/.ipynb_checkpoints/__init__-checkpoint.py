@@ -1,0 +1,1 @@
+from src.model.normalizing_flow.classic.flow import FlowModel
