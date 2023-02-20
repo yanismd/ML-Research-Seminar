@@ -1,5 +1,6 @@
 from typing import List
-
+from torchvision import models
+from torchsummary import summary
 import torch
 from torch.nn import BCELoss
 
@@ -8,7 +9,7 @@ import src.utils.utils as utils
 
 
 class Flow_Encoder(torch.nn.Module):
-    def __init__(self, hidden_sizes, z_dim, n_channels, n_rows, n_cols):
+    def __init__(self, hidden_sizes, z_dim, n_channels, n_rows, n_cols, conv_sizes, conv_kernel_sizes,conv_strides):
         super(Flow_Encoder, self).__init__()
 
         self.n_channels = n_channels
@@ -16,50 +17,69 @@ class Flow_Encoder(torch.nn.Module):
         self.n_cols = n_cols
         input_dim = n_channels * n_rows * n_cols
 
-        hidden_sizes = [input_dim] + hidden_sizes
+        #hidden_sizes = [input_dim] + hidden_sizes
 
-        self.net = []
+        self.fc_net = []
+        self.conv_net = []
+        for i in range(len(conv_sizes)-1):
+            self.conv_net.append( nn.Conv2d(conv_sizes[i], conv_sizes[i + 1], conv_kernel_sizes[i], conv_strides[i] , padding = 'same'))
+            self.conv_net.append(nn.ReLU())
+        #self.conv_net.append(nn.Flatten())
+
         for i in range(len(hidden_sizes) - 1):
-            self.net.append(nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]))
-            self.net.append(nn.ReLU())
+            self.fc_net.append(nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]))
+            self.fc_net.append(nn.ReLU())
 
-        self.net = nn.Sequential(*self.net)
+        
+            #self.net.append()
+        self.fc_net = nn.Sequential(*self.fc_net)
+        self.conv_net = nn.Sequential(*self.conv_net)
 
         self.mu_net = nn.Linear(hidden_sizes[-1], z_dim)
         self.sigma_net = nn.Linear(hidden_sizes[-1], z_dim)
+        #summary(self, ( 3, 32, 32))
 
     def forward(self, x):
-        #print('x : ',   (torch.min(x)))
-        #print('weights : ', torch.sum(torch.isnan(self.net[2].weight)))
-        h = self.net(x)
-        #print('h : ', h)
+        c = self.conv_net(x)
+        c = c.view(c.size(0), -1)
+
+        h = self.fc_net(c)
         return self.mu_net(h), self.sigma_net(h)
 
 
 class Flow_Decoder(torch.nn.Module):
-    def __init__(self, hidden_sizes, z_dim, n_channels, n_rows, n_cols):
+    def __init__(self, hidden_sizes, z_dim, n_channels, n_rows, n_cols, conv_sizes, conv_kernel_sizes,conv_strides):
         super(Flow_Decoder, self).__init__()
 
         self.n_channels = n_channels
         self.n_rows = n_rows
         self.n_cols = n_cols
+        self.conv_sizes = conv_sizes
         input_dim = n_channels * n_rows * n_cols
 
         hidden_sizes = [z_dim] + hidden_sizes
-        self.net = []
-
+        self.conv_net = []
+        self.fc_net = []
         for i in range(len(hidden_sizes) - 1):
-            self.net.append(nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]))
-            self.net.append(nn.ReLU())
+            self.fc_net.append(nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]))
+            self.fc_net.append(nn.ReLU())
+        
+        for i in range(len(conv_sizes)-2):
+            self.conv_net.append( nn.ConvTranspose2d(conv_sizes[i], conv_sizes[i + 1], conv_kernel_sizes[i], conv_strides[i] ))
+            self.conv_net.append(nn.ReLU())
+        self.conv_net.append( nn.Conv2d(conv_sizes[len(conv_sizes)-2], conv_sizes[len(conv_sizes)- 1], conv_kernel_sizes[len(conv_sizes)-2], conv_strides[len(conv_sizes)-2] ))
+        self.conv_net.append(nn.Sigmoid())
 
-        self.net = nn.Sequential(*self.net)
+        self.conv_net = nn.Sequential(*self.conv_net)
+        self.fc_net = nn.Sequential(*self.fc_net)
 
-        self.output_net = nn.Linear(hidden_sizes[-1], input_dim)
+        self.output_net = nn.Linear(conv_sizes[-2], input_dim)
 
     def forward(self, z: torch.Tensor):
-        h = self.net(z)
+        h = self.fc_net(z)
+        c = self.conv_net(h.view(-1, self.n_cols, self.n_rows, self.conv_sizes[0]))
         #return F.sigmoid(self.output_net(h)).view(-1, self.n_channels, self.n_rows, self.n_cols)
-        return (self.output_net(h)).view(-1, self.n_channels, self.n_rows, self.n_cols)
+        return c
 
 
 class FlowModel(nn.Module):
@@ -72,12 +92,15 @@ class FlowModel(nn.Module):
             n_channels,
             n_rows,
             n_cols,
-            activation=torch.tanh
+            activation=torch.tanh,
+            conv_sizes = [],
+            conv_kernel_sizes = [],
+            conv_strides = [],
     ):
         super().__init__()
 
-        self.encoder = Flow_Encoder(hidden_sizes_encoder, z_dim, n_channels, n_rows, n_cols)
-        self.decoder = Flow_Decoder(hidden_sizes_decoder, z_dim, n_channels, n_rows, n_cols)
+        self.encoder = Flow_Encoder(hidden_sizes_encoder, z_dim, n_channels, n_rows, n_cols, conv_sizes, conv_kernel_sizes,conv_strides )
+        self.decoder = Flow_Decoder(hidden_sizes_decoder, z_dim, n_channels, n_rows, n_cols, conv_sizes[::-1], conv_kernel_sizes[::-1],conv_strides[::-1])
 
         self.net = []
 
@@ -95,10 +118,9 @@ class FlowModel(nn.Module):
         mu: tensor with shape (batch_size, D)
         sigma: tensor with shape (batch_size, D)
         """
-        #print(torch.flatten(x, start_dim=1))
-        #print('x before flatten : ', x.shape)
-        mu, log_var = self.encoder(torch.FloatTensor(torch.flatten(x, start_dim=1)))
-        #print(torch.sum(torch.isnan(mu)), torch.sum(torch.isnan(log_var)))
+
+        #mu, log_var = self.encoder(torch.FloatTensor(torch.flatten(x, start_dim=1)))
+        mu, log_var = self.encoder(torch.FloatTensor(x))
         z = utils.sampling(mu, log_var)
 
         log_prob_z0 = (-0.5 * torch.log(torch.tensor(2 * torch.pi))
@@ -115,26 +137,18 @@ class FlowModel(nn.Module):
             .sum(dim=1)
 
         #return self.decoder(z), mu, log_var
-        #print(torch.sum(torch.isnan(z)))
+
         return self.decoder(z), mu,  log_var,log_prob_z0, log_prob_zk, log_det
 
     #def loss_function(self, x, y, mu, log_var):
     def loss_function(self, x, y, mu,  log_var, log_prob_z0, log_prob_zk, log_det ):
         #reconstruction_error = F.binary_cross_entropy(y.view(-1, self.n_pixels), x.view(-1, self.n_pixels),
         #                                              reduction='sum')
-        #print(y.view(-1, self.n_pixels).min(),  x.view(-1, self.n_pixels).min())
         #reconstruction_error_1 = BCELoss(reduction = 'sum')(y.view(-1, self.n_pixels), x.view(-1, self.n_pixels)) #,
         reconstruction_error = nn.MSELoss(reduction='sum')(y.view(-1, self.n_pixels),  x.view(-1, self.n_pixels))                                                                            
-        #print('reconstruction_error 1 :', reconstruction_error_1)
-        #print('reconstruction_error:', reconstruction_error.shape)
         KLD = 0.5 * torch.sum(mu.pow(2) + log_var.exp() - 1. - log_var, dim = 1, keepdim = True )
-        #print('KLD:', KLD.shape)
         loss = KLD - log_det +reconstruction_error
         #loss = torch.mean(log_prob_z0) + reconstruction_error - torch.mean(log_prob_zk) - torch.mean(log_det)
-        #print('reconstruction_error:', reconstruction_error)
-        #print('KLD:', KLD)
-        #print('log_det : ', log_det)
-        #print('loss : ', loss)
 
         #return reconstruction_error + KLD
         return loss.mean()
@@ -185,7 +199,6 @@ def train_flow_inverse_noise(model, optimizer, data_train_loader, n_epoch, noise
             loss_vae.backward()
             train_loss += loss_vae.item()
             optimizer.step()
-        #print('ok')
         if epoch %10==0 :
             print('[*] Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(data_train_loader.dataset)))
 
